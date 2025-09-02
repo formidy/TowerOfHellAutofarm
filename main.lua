@@ -1312,8 +1312,8 @@ function TowerOfHellAutofarm:createGUI()
     })
 
     local AutofarmTab = Window:CreateTab({Name = "Autofarm"})
-    local ConfigTab = Window:CreateTab({Name = "Config & Legit"})
-    local UtilityTab = Window:CreateTab({Name = "Utility & Features"})
+    local ConfigTab = Window:CreateTab({Name = "Config})
+    local UtilityTab = Window:CreateTab({Name = "Utility"})
     local InfoTab = Window:CreateTab({Name = "Info"})
 
     self.ui.startButton = AutofarmTab:Button({
