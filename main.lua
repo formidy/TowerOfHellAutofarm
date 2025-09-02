@@ -22,6 +22,9 @@ function TowerOfHellAutofarm.new()
     self.waitingForNewTower = false
     self.roundChanged = false
     self.idleStatus = "Ready"
+    self.killbrickFlag = nil
+    self.originalWalkSpeed = 16
+    self.originalJumpPower = 50
     
     self.roundDetection = {
         skipBool = nil,
@@ -54,7 +57,10 @@ function TowerOfHellAutofarm.new()
         chatVariety = true,
         antiAfk = false,
         speedBoost = false,
-        jumpBoost = false
+        jumpBoost = false,
+        noclipEnabled = true,
+        instantTeleport = false,
+        legitPartsPerSection = 5
     }
     
     self.chatMessages = {
@@ -126,6 +132,14 @@ function chatMessage(str)
     end
 end
 
+function TowerOfHellAutofarm:storeOriginalStats()
+    if self.player.Character and self.player.Character:FindFirstChild("Humanoid") then
+        local humanoid = self.player.Character.Humanoid
+        self.originalWalkSpeed = humanoid.WalkSpeed
+        self.originalJumpPower = humanoid.JumpPower
+    end
+end
+
 function TowerOfHellAutofarm:findInstancesWithPosition(query)
     local instances = {}
     local instanceTypes = {}
@@ -190,7 +204,8 @@ function TowerOfHellAutofarm:findAndDestroyKillbricks()
             if sections then
                 for _, part in pairs(sections:GetDescendants()) do
                     if part:IsA("BasePart") then
-                        if part:FindFirstChild("kills") or part.Name:lower() == "killpart" then
+                        local partName = part.Name:lower()
+                        if part:FindFirstChild("kills") or partName == "killpart" or partName:find("killwall") then
                             part:Destroy()
                             killbricksDestroyed = killbricksDestroyed + 1
                         end
@@ -200,9 +215,12 @@ function TowerOfHellAutofarm:findAndDestroyKillbricks()
         end
         
         for _, obj in pairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and obj.Name:lower() == "killpart" then
-                obj:Destroy()
-                killbricksDestroyed = killbricksDestroyed + 1
+            if obj:IsA("BasePart") then
+                local objName = obj.Name:lower()
+                if objName == "killpart" or objName:find("killwall") then
+                    obj:Destroy()
+                    killbricksDestroyed = killbricksDestroyed + 1
+                end
             end
         end
     end)
@@ -291,6 +309,43 @@ function TowerOfHellAutofarm:safelyDisableScripts()
     end)
 end
 
+function TowerOfHellAutofarm:disableKillbrickScript()
+    pcall(function()
+        if not self.killbrickFlag then
+            self.killbrickFlag = Instance.new("BoolValue")
+            self.killbrickFlag.Name = "KillbrickFlag"
+            self.killbrickFlag.Parent = workspace
+        end
+    end)
+    
+    pcall(function()
+        local playerScripts = self.player.PlayerScripts
+        local localTags = playerScripts:FindFirstChild("LocalTags")
+        if localTags then
+            local killBrick = localTags:FindFirstChild("KillBrick")
+            if killBrick then
+                killBrick.Disabled = true
+            end
+        end
+    end)
+    
+    if hookfunction then
+        pcall(function()
+            local humanoid = self.player.Character and self.player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                hookfunction(humanoid, "TakeDamage", function() return end)
+                local oldHealth = humanoid.Health
+                hookfunction(getmetatable(humanoid).__newindex, function(t, k, v)
+                    if k == "Health" and v <= 0 then
+                        return
+                    end
+                    return oldHealth
+                end)
+            end
+        end)
+    end
+end
+
 -- ==========================================
 -- CORE AUTOFARM LOGIC
 -- ==========================================
@@ -322,13 +377,23 @@ function TowerOfHellAutofarm:setupFinishGlowDetection()
                     if #sections > 0 and sections[1]:FindFirstChild("start") then
                         local startPos = sections[1].start.Position + Vector3.new(0, 3, 0)
                         self:updateStatusUI(0, 0, "Returning to start")
-                        self:tweenToPosition(startPos, 3)
+                        self:moveToPosition(startPos, 3)
                     end
                 end)
             end
         end)
         table.insert(self.connections, connection)
     end
+end
+
+function TowerOfHellAutofarm:instantTeleport(targetPosition)
+    if not self.player.Character or not self.player.Character:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
+    
+    local humanoidRootPart = self.player.Character.HumanoidRootPart
+    humanoidRootPart.CFrame = CFrame.new(targetPosition)
+    return true
 end
 
 function TowerOfHellAutofarm:tweenToPosition(targetPosition, duration)
@@ -411,6 +476,14 @@ function TowerOfHellAutofarm:tweenToPosition(targetPosition, duration)
     return true
 end
 
+function TowerOfHellAutofarm:moveToPosition(targetPosition, duration)
+    if self.config.instantTeleport then
+        return self:instantTeleport(targetPosition)
+    else
+        return self:tweenToPosition(targetPosition, duration)
+    end
+end
+
 function TowerOfHellAutofarm:checkTouch(targetPosition, threshold)
     if not self.player.Character or not self.player.Character:FindFirstChild("HumanoidRootPart") then
         return false
@@ -462,7 +535,7 @@ function TowerOfHellAutofarm:cleanupConnections()
         self.supportPart = nil
     end
     
-    if not self.config.legitMode then
+    if not self.config.legitMode and not self.config.noclipEnabled then
         self:disableNoclip()
     end
 end
@@ -490,7 +563,7 @@ function TowerOfHellAutofarm:startAutofarm()
                 if not self.autofarmEnabled or self.roundChanged then break end
                 
                 if self.config.legitMode then
-                    self:legitModeProcessSection(section)
+                    self:processLegitSection(section, completedSections, #sections)
                     completedSections = completedSections + 1
                 else
                     self:updateStatus("Status: Moving to " .. section.Name)
@@ -507,8 +580,8 @@ function TowerOfHellAutofarm:startAutofarm()
                         while attempts < maxAttempts and not reached and self.autofarmEnabled and not self.roundChanged do
                             attempts = attempts + 1
                             
-                            self:tweenToPosition(targetPos, nil)
-                            if self.currentTween then
+                            self:moveToPosition(targetPos, nil)
+                            if self.currentTween and not self.config.instantTeleport then
                                 self.currentTween.Completed:Wait()
                             end
                             reached = self:checkTouch(targetPos, self.config.touchDistance)
@@ -552,15 +625,11 @@ function TowerOfHellAutofarm:startAutofarm()
                         self:updateStatus("Status: Going to " .. finishGlow.obj.Name)
                         self:updateStatusUI(completedSections, #sections, "Going to finish")
                         
-                        if self.config.legitMode then
-                            reached = self:legitMoveToPosition(targetPos)
-                        else
-                            self:tweenToPosition(targetPos, 3)
-                            if self.currentTween then
-                                self.currentTween.Completed:Wait()
-                            end
-                            reached = self:checkTouch(targetPos, self.config.touchDistance)
+                        self:moveToPosition(targetPos, 3)
+                        if self.currentTween and not self.config.instantTeleport then
+                            self.currentTween.Completed:Wait()
                         end
+                        reached = self:checkTouch(targetPos, self.config.touchDistance)
                         
                         if reached then
                             self.roundDetection.towersCompleted = self.roundDetection.towersCompleted + 1
@@ -676,47 +745,23 @@ function TowerOfHellAutofarm:cleanupLegitPlatforms()
     self.legitPlatforms = {}
 end
 
-function TowerOfHellAutofarm:legitMoveToPosition(targetPosition)
-    if not self.player.Character or not self.player.Character:FindFirstChild("HumanoidRootPart") then
-        return false
-    end
+function TowerOfHellAutofarm:processLegitSection(section, completedSections, totalSections)
+    self:updateStatus("Status: Legit mode - Processing " .. section.Name)
+    self:updateStatusUI(completedSections, totalSections, "Legit: Processing " .. section.Name)
     
-    local humanoidRootPart = self.player.Character.HumanoidRootPart
-    local humanoid = self.player.Character:FindFirstChildOfClass("Humanoid")
-    
-    self:enableNoclip()
-    
-    local currentPos = humanoidRootPart.Position
-    local distance = (targetPosition - currentPos).Magnitude
-    local steps = math.ceil(distance / self.config.legitStepDistance)
-    
-    for i = 1, steps do
-        if not self.autofarmEnabled then break end
-        
-        local alpha = i / steps
-        local nextPos = currentPos:lerp(targetPosition, alpha)
-        
-        local platform = self:createLegitPlatform(nextPos - Vector3.new(0, 3, 0))
-        
-        humanoid:MoveTo(nextPos)
-        
-        local timeout = 0
-        while (humanoidRootPart.Position - nextPos).Magnitude > 4 and timeout < 50 do
-            wait(0.1)
-            timeout = timeout + 1
-            if not self.autofarmEnabled or self.roundChanged then break end
+    local startPart = section:FindFirstChild("start")
+    if startPart and startPart:IsA("BasePart") then
+        local startPos = startPart.Position + Vector3.new(0, 3, 0)
+        self:moveToPosition(startPos, nil)
+        if self.currentTween and not self.config.instantTeleport then
+            self.currentTween.Completed:Wait()
         end
-        
-        wait(0.2 + math.random(0, 3) / 10)
+        wait(self.config.waitTime / 2)
     end
     
-    return (humanoidRootPart.Position - targetPosition).Magnitude < self.config.touchDistance
-end
-
-function TowerOfHellAutofarm:legitModeProcessSection(section)
     local parts = {}
     for _, part in pairs(section:GetDescendants()) do
-        if part:IsA("BasePart") and part.Name ~= "start" and part.CanCollide then
+        if part:IsA("BasePart") and part.Name ~= "start" and part.CanCollide and part.Size.Magnitude > 2 then
             table.insert(parts, part)
         end
     end
@@ -725,16 +770,26 @@ function TowerOfHellAutofarm:legitModeProcessSection(section)
         return a.Position.Y < b.Position.Y
     end)
     
-    for i, part in pairs(parts) do
+    local partsToVisit = math.min(#parts, self.config.legitPartsPerSection)
+    
+    for i = 1, partsToVisit do
         if not self.autofarmEnabled or self.roundChanged then break end
         
-        local targetPos = part.Position + Vector3.new(0, 4, 0)
-        self:updateStatusUI(0, 0, "Legit: Moving to part " .. i .. "/" .. #parts)
+        local part = parts[i]
+        local targetPos = part.Position + Vector3.new(
+            math.random(-2, 2),
+            4,
+            math.random(-2, 2)
+        )
         
-        if not self:legitMoveToPosition(targetPos) then
-            break
+        self:updateStatusUI(completedSections, totalSections, "Legit: Part " .. i .. "/" .. partsToVisit)
+        
+        self:moveToPosition(targetPos, nil)
+        if self.currentTween and not self.config.instantTeleport then
+            self.currentTween.Completed:Wait()
         end
-        wait(0.5 + math.random(0, 10) / 10)
+        
+        wait(0.3 + math.random(0, 7) / 10)
     end
 end
 
@@ -971,8 +1026,10 @@ function TowerOfHellAutofarm:updateStatusUI(section, total, status)
         local towerText = "Towers: " .. self.roundDetection.towersCompleted
         local statusText = "Status: " .. (status or "Ready")
         local modeText = self.config.legitMode and " [LEGIT]" or " [SPEED]"
+        local noclipText = self.config.noclipEnabled and " [NOCLIP]" or ""
+        local instantText = self.config.instantTeleport and " [INSTANT]" or ""
         
-        self.statusUI.Text = "Tower of Hell Autofarm" .. modeText .. "\n" .. roundText .. " | " .. sectionText .. " | " .. towerText .. " | " .. statusText
+        self.statusUI.Text = "Tower of Hell Autofarm" .. modeText .. noclipText .. instantText .. "\n" .. roundText .. " | " .. sectionText .. " | " .. towerText .. " | " .. statusText
     end
 end
 
@@ -1023,14 +1080,24 @@ function TowerOfHellAutofarm:setupAntiAfk()
 end
 
 function TowerOfHellAutofarm:applySpeedBoost()
-    if self.config.speedBoost and self.player.Character and self.player.Character:FindFirstChild("Humanoid") then
-        self.player.Character.Humanoid.WalkSpeed = 50
+    if self.player.Character and self.player.Character:FindFirstChild("Humanoid") then
+        local humanoid = self.player.Character.Humanoid
+        if self.config.speedBoost then
+            humanoid.WalkSpeed = 50
+        else
+            humanoid.WalkSpeed = self.originalWalkSpeed
+        end
     end
 end
 
 function TowerOfHellAutofarm:applyJumpBoost()
-    if self.config.jumpBoost and self.player.Character and self.player.Character:FindFirstChild("Humanoid") then
-        self.player.Character.Humanoid.JumpPower = 100
+    if self.player.Character and self.player.Character:FindFirstChild("Humanoid") then
+        local humanoid = self.player.Character.Humanoid
+        if self.config.jumpBoost then
+            humanoid.JumpPower = 100
+        else
+            humanoid.JumpPower = self.originalJumpPower
+        end
     end
 end
 
@@ -1051,7 +1118,7 @@ function TowerOfHellAutofarm:createGUI()
     end
 
     local Window = Library:New({
-        Name = "Tower of Hell Autofarm v6.0",
+        Name = "Tower of Hell Autofarm v7.0",
         Padding = 5
     })
 
@@ -1114,11 +1181,7 @@ function TowerOfHellAutofarm:createGUI()
                     local finishGlow = self:findFinishGlow()
                     if finishGlow then
                         local targetPos = finishGlow.position.Position + Vector3.new(0, 2, 0)
-                        if self.config.legitMode then
-                            self:legitMoveToPosition(targetPos)
-                        else
-                            self:tweenToPosition(targetPos, 3)
-                        end
+                        self:moveToPosition(targetPos, 3)
                     end
                 end)
             end
@@ -1179,7 +1242,35 @@ function TowerOfHellAutofarm:createGUI()
         Name = "Legit Mode", State = self.config.legitMode,
         Callback = function(state)
             self.config.legitMode = state
-            if state then self:enableNoclip() else self:disableNoclip(); self:cleanupLegitPlatforms() end
+            if state then self:enableNoclip() else 
+                if not self.config.noclipEnabled then
+                    self:disableNoclip()
+                end
+                self:cleanupLegitPlatforms() 
+            end
+            self:saveConfig()
+        end
+    })
+
+    local noclipToggle = ConfigTab:Toggle({
+        Name = "Noclip Enabled", State = self.config.noclipEnabled,
+        Callback = function(state) 
+            self.config.noclipEnabled = state
+            if state then 
+                self:enableNoclip() 
+            else 
+                if not self.config.legitMode then
+                    self:disableNoclip()
+                end
+            end
+            self:saveConfig()
+        end
+    })
+
+    local instantToggle = ConfigTab:Toggle({
+        Name = "Instant Teleport", State = self.config.instantTeleport,
+        Callback = function(state) 
+            self.config.instantTeleport = state
             self:saveConfig()
         end
     })
@@ -1209,6 +1300,11 @@ function TowerOfHellAutofarm:createGUI()
         Callback = function(value) self.config.platformLifetime = value; self:saveConfig() end
     })
 
+    local legitPartsSlider = LegitTab:Slider({
+        Name = "Parts Per Section", Min = 3, Max = 15, Default = self.config.legitPartsPerSection, Step = 1,
+        Callback = function(value) self.config.legitPartsPerSection = value; self:saveConfig() end
+    })
+
     LegitTab:Button({
         Name = "Clear All Platforms",
         Callback = function()
@@ -1218,7 +1314,7 @@ function TowerOfHellAutofarm:createGUI()
     })
 
     LegitTab:Button({
-        Name = "Toggle Noclip",
+        Name = "Toggle Noclip Manual",
         Callback = function()
             if self.noclipConnection then
                 self:disableNoclip()
@@ -1329,7 +1425,10 @@ function TowerOfHellAutofarm:createGUI()
                     platformSizeSlider:SetValue(self.config.legitPlatformSize)
                     stepDistanceSlider:SetValue(self.config.legitStepDistance)
                     platformLifetimeSlider:SetValue(self.config.platformLifetime)
+                    legitPartsSlider:SetValue(self.config.legitPartsPerSection)
                     legitToggle:SetValue(self.config.legitMode)
+                    noclipToggle:SetValue(self.config.noclipEnabled)
+                    instantToggle:SetValue(self.config.instantTeleport)
                     safetyToggle:SetValue(self.config.safetyEnabled)
                     autoRestartToggle:SetValue(self.config.autoRestartOnRoundChange)
                     killbricksToggle:SetValue(self.config.autoKillbricks)
@@ -1350,11 +1449,7 @@ function TowerOfHellAutofarm:createGUI()
             local sections = self:getSections()
             if #sections > 0 and sections[1]:FindFirstChild("start") then
                 local startPos = sections[1].start.Position + Vector3.new(0, 3, 0)
-                if self.config.legitMode then
-                    self:legitMoveToPosition(startPos)
-                else
-                    self:tweenToPosition(startPos, 2)
-                end
+                self:moveToPosition(startPos, 2)
             end
         end
     })
@@ -1365,11 +1460,7 @@ function TowerOfHellAutofarm:createGUI()
             local finishGlow = self:findFinishGlow()
             if finishGlow then
                 local finishPos = finishGlow.position.Position + Vector3.new(0, 2, 0)
-                if self.config.legitMode then
-                    self:legitMoveToPosition(finishPos)
-                else
-                    self:tweenToPosition(finishPos, 3)
-                end
+                self:moveToPosition(finishPos, 3)
                 Library:Notify({Description = "Found and teleporting to " .. finishGlow.obj.Name, Duration = 2})
             else
                 Library:Notify({Description = "No finish found!", Duration = 2})
@@ -1394,7 +1485,7 @@ function TowerOfHellAutofarm:createGUI()
         end
     })
 
-    InfoTab:Label({Message = "Tower of Hell Autofarm v6.0"})
+    InfoTab:Label({Message = "Tower of Hell Autofarm v7.0"})
     InfoTab:Label({Message = "Perfect autofarm with round detection"})
 
     InfoTab:Button({
@@ -1435,7 +1526,9 @@ end
 -- ==========================================
 
 function TowerOfHellAutofarm:initialize()
+    self:storeOriginalStats()
     self:safeKickProtection()
+    self:disableKillbrickScript()
     
     if self.player.Character then
         self:createBypassTags()
@@ -1443,9 +1536,14 @@ function TowerOfHellAutofarm:initialize()
     
     self.player.CharacterAdded:Connect(function()
         wait(1)
+        self:storeOriginalStats()
         self:createBypassTags()
         self:applySpeedBoost()
         self:applyJumpBoost()
+        self:disableKillbrickScript()
+        if self.config.noclipEnabled then
+            self:enableNoclip()
+        end
     end)
     
     self:safelyDisableScripts()
@@ -1454,12 +1552,18 @@ function TowerOfHellAutofarm:initialize()
     self:loadConfig()
     self:autoSaveConfig()
     self:setupAntiAfk()
+    
+    if self.config.noclipEnabled then
+        self:enableNoclip()
+    end
+    
     self:createGUI()
     
     spawn(function()
         while true do
             wait(2)
             self:createBypassTags()
+            self:disableKillbrickScript()
         end
     end)
     
@@ -1482,5 +1586,5 @@ function TowerOfHellAutofarm:initialize()
     end)
 end
 
-local neutralizer = TowerOfHellAutofarm.new()
-neutralizer:initialize()
+local autofarm = TowerOfHellAutofarm.new()
+autofarm:initialize()
