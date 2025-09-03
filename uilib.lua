@@ -988,6 +988,8 @@ function Library:New(options: table)
 				--	Label["7"].TextBounds.Y
 				--)
 			end
+			
+			return Label
 		end
 		
 		function Tab:Slider(options: table)
@@ -1179,6 +1181,8 @@ function Library:New(options: table)
 			do
 				Slider:SetValue(options["Default"]) --// will position slider @ default area and not hard coded position
 			end
+			
+			return Slider
 		end
 		
 		function Tab:Toggle(options: table)
@@ -1286,6 +1290,8 @@ function Library:New(options: table)
 					options["Callback"](Toggle:GetValue())
 				end)
 			end
+			
+			return Toggle
 		end
 		
 		function Tab:Textbox(options: table)
@@ -1369,6 +1375,8 @@ function Library:New(options: table)
 					options["Callback"](Textbox:GetValue())
 				end)
 			end
+			
+			return Textbox
 		end
 		
 		function Tab:Dropdown(options: table)
@@ -1380,7 +1388,7 @@ function Library:New(options: table)
 			}, options or {})
 
 			local Dropdown = {
-				Open = false,
+				IsOpen = false, -- Changed from "Open" to "IsOpen" to avoid conflict
 				Selected = options.Default or options.Options[1] or "None",
 				OptionButtons = {}
 			}
@@ -1424,6 +1432,7 @@ function Library:New(options: table)
 				Dropdown["32"]["Name"] = [[icon]];
 				Dropdown["32"]["Position"] = UDim2.new(1, -18, 0.5, -9);
 				Dropdown["32"]["Rotation"] = 0;
+				Dropdown["32"]["ZIndex"] = 2;
 
 
 				-- StarterDropdown.ui lib.gamesense window.tab.content.dropdown.UICorner
@@ -1466,6 +1475,7 @@ function Library:New(options: table)
 				Dropdown["36"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
 				Dropdown["36"]["Name"] = [[options]];
 				Dropdown["36"]["BackgroundTransparency"] = 0;
+				Dropdown["36"]["ZIndex"] = 3;
 
 
 				-- StarterDropdown.ui lib.gamesense window.tab.content.dropdown.options.UIListLayout
@@ -1490,6 +1500,7 @@ function Library:New(options: table)
 				OptionButton["38"]["Name"] = [[option]];
 				OptionButton["38"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
 				OptionButton["38"]["Text"] = "    " .. tostring(option);
+				OptionButton["38"]["ZIndex"] = 4;
 				
 				OptionButton["38"].MouseEnter:Connect(function()
 					Library:_tween(
@@ -1515,7 +1526,9 @@ function Library:New(options: table)
 					Dropdown.Selected = option
 					Dropdown["35"].Text = option
 					Dropdown:Close()
-					options.Callback(option)
+					if typeof(options.Callback) == "function" then
+						options.Callback(option)
+					end
 				end)
 				
 				table.insert(Dropdown.OptionButtons, OptionButton)
@@ -1523,8 +1536,8 @@ function Library:New(options: table)
 
 			--// Methods
 			function Dropdown:Open()
-				if not Dropdown.Open then
-					Dropdown.Open = true
+				if not Dropdown.IsOpen then
+					Dropdown.IsOpen = true
 					local optionCount = #options.Options
 					local targetSize = UDim2.new(0, 350, 0, 30 + (optionCount * 26) + ((optionCount - 1) * 2))
 					
@@ -1544,8 +1557,8 @@ function Library:New(options: table)
 			end
 			
 			function Dropdown:Close()
-				if Dropdown.Open then
-					Dropdown.Open = false
+				if Dropdown.IsOpen then
+					Dropdown.IsOpen = false
 					
 					Library:_tween(
 						Dropdown["30"],
@@ -1566,7 +1579,9 @@ function Library:New(options: table)
 				if table.find(options.Options, value) then
 					Dropdown.Selected = value
 					Dropdown["35"].Text = value
-					options.Callback(value)
+					if typeof(options.Callback) == "function" then
+						options.Callback(value)
+					end
 				end
 			end
 			
@@ -1577,7 +1592,7 @@ function Library:New(options: table)
 			--// Logic
 			do
 				Dropdown["31"].MouseButton1Down:Connect(function()
-					if Dropdown.Open then
+					if Dropdown.IsOpen then
 						Dropdown:Close()
 					else
 						Dropdown:Open()
