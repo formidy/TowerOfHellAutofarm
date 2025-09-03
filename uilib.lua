@@ -1371,6 +1371,228 @@ function Library:New(options: table)
 			end
 		end
 		
+		function Tab:Dropdown(options: table)
+			options = Library:_validate({
+				Name = "Dropdown",
+				Options = {"Option 1", "Option 2", "Option 3"},
+				Default = nil,
+				Callback = function(v) print(v) end
+			}, options or {})
+
+			local Dropdown = {
+				Open = false,
+				Selected = options.Default or options.Options[1] or "None",
+				OptionButtons = {}
+			}
+
+			--// Render
+			do
+				------------- DROPDOWN
+				-- StarterDropdown.ui lib.gamesense window.tab.content.dropdown
+				Dropdown["30"] = Instance.new("Frame", Tab["5"]);
+				Dropdown["30"]["BorderSizePixel"] = 0;
+				Dropdown["30"]["BackgroundColor3"] = Color3.fromRGB(26, 26, 26);
+				Dropdown["30"]["Size"] = UDim2.new(0, 350, 0, 30);
+				Dropdown["30"]["Position"] = UDim2.new(0, 0, 0.08696, 0);
+				Dropdown["30"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+				Dropdown["30"]["Name"] = [[dropdown]];
+				Dropdown["30"]["ClipsDescendants"] = true;
+
+
+				-- StarterDropdown.ui lib.gamesense window.tab.content.dropdown.click
+				Dropdown["31"] = Instance.new("TextButton", Dropdown["30"]);
+				Dropdown["31"]["BorderSizePixel"] = 0;
+				Dropdown["31"]["TextXAlignment"] = Enum.TextXAlignment.Left;
+				Dropdown["31"]["TextSize"] = 14;
+				Dropdown["31"]["TextColor3"] = Color3.fromRGB(228, 228, 228);
+				Dropdown["31"]["BackgroundColor3"] = Color3.fromRGB(27, 27, 27);
+				Dropdown["31"]["FontFace"] = Font.new([[rbxasset://fonts/families/RobotoMono.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+				Dropdown["31"]["Size"] = UDim2.new(0, 333, 0, 22);
+				Dropdown["31"]["BackgroundTransparency"] = 1;
+				Dropdown["31"]["Name"] = [[click]];
+				Dropdown["31"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+				Dropdown["31"]["Text"] = typeof(options["Name"]) == "string" and options["Name"] or "Dropdown";
+				Dropdown["31"]["Position"] = UDim2.new(0.5, -166, 0, 4);
+				Dropdown["31"]["ZIndex"] = 2;
+
+
+				-- StarterDropdown.ui lib.gamesense window.tab.content.dropdown.click.icon
+				Dropdown["32"] = Instance.new("ImageLabel", Dropdown["31"]);
+				Dropdown["32"]["Image"] = [[rbxassetid://11419719391]];
+				Dropdown["32"]["Size"] = UDim2.new(0, 18, 0, 18);
+				Dropdown["32"]["BackgroundTransparency"] = 1;
+				Dropdown["32"]["Name"] = [[icon]];
+				Dropdown["32"]["Position"] = UDim2.new(1, -18, 0.5, -9);
+				Dropdown["32"]["Rotation"] = 0;
+
+
+				-- StarterDropdown.ui lib.gamesense window.tab.content.dropdown.UICorner
+				Dropdown["33"] = Instance.new("UICorner", Dropdown["30"]);
+				Dropdown["33"]["CornerRadius"] = UDim.new(0, 2);
+
+
+				-- StarterDropdown.ui lib.gamesense window.tab.content.dropdown.UIStroke
+				Dropdown["34"] = Instance.new("UIStroke", Dropdown["30"]);
+				Dropdown["34"]["Transparency"] = 0.8;
+				Dropdown["34"]["ApplyStrokeMode"] = Enum.ApplyStrokeMode.Border;
+				Dropdown["34"]["LineJoinMode"] = Enum.LineJoinMode.Bevel;
+				Dropdown["34"]["Thickness"] = 0.6;
+				Dropdown["34"]["Color"] = Color3.fromRGB(100, 100, 100);
+
+
+				-- StarterDropdown.ui lib.gamesense window.tab.content.dropdown.value
+				Dropdown["35"] = Instance.new("TextLabel", Dropdown["30"]);
+				Dropdown["35"]["BorderSizePixel"] = 0;
+				Dropdown["35"]["TextXAlignment"] = Enum.TextXAlignment.Right;
+				Dropdown["35"]["BackgroundColor3"] = Color3.fromRGB(27, 27, 27);
+				Dropdown["35"]["TextSize"] = 12;
+				Dropdown["35"]["FontFace"] = Font.new([[rbxasset://fonts/families/RobotoMono.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+				Dropdown["35"]["TextColor3"] = Color3.fromRGB(136, 136, 136);
+				Dropdown["35"]["BackgroundTransparency"] = 1;
+				Dropdown["35"]["Size"] = UDim2.new(0, 130, 0, 22);
+				Dropdown["35"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+				Dropdown["35"]["Text"] = Dropdown.Selected;
+				Dropdown["35"]["Name"] = [[value]];
+				Dropdown["35"]["Position"] = UDim2.new(1, -161, 0, 4);
+				Dropdown["35"]["ZIndex"] = 2;
+
+
+				-- StarterDropdown.ui lib.gamesense window.tab.content.dropdown.options
+				Dropdown["36"] = Instance.new("Frame", Dropdown["30"]);
+				Dropdown["36"]["BorderSizePixel"] = 0;
+				Dropdown["36"]["BackgroundColor3"] = Color3.fromRGB(26, 26, 26);
+				Dropdown["36"]["Size"] = UDim2.new(0, 350, 0, 0);
+				Dropdown["36"]["Position"] = UDim2.new(0, 0, 0, 30);
+				Dropdown["36"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+				Dropdown["36"]["Name"] = [[options]];
+				Dropdown["36"]["BackgroundTransparency"] = 0;
+
+
+				-- StarterDropdown.ui lib.gamesense window.tab.content.dropdown.options.UIListLayout
+				Dropdown["37"] = Instance.new("UIListLayout", Dropdown["36"]);
+				Dropdown["37"]["Padding"] = UDim.new(0, 2);
+				Dropdown["37"]["SortOrder"] = Enum.SortOrder.LayoutOrder;
+			end
+
+			--// Create option buttons
+			for i, option in ipairs(options.Options) do
+				local OptionButton = {}
+				
+				OptionButton["38"] = Instance.new("TextButton", Dropdown["36"]);
+				OptionButton["38"]["BorderSizePixel"] = 0;
+				OptionButton["38"]["TextXAlignment"] = Enum.TextXAlignment.Left;
+				OptionButton["38"]["TextSize"] = 14;
+				OptionButton["38"]["TextColor3"] = Color3.fromRGB(168, 168, 168);
+				OptionButton["38"]["BackgroundColor3"] = Color3.fromRGB(31, 31, 31);
+				OptionButton["38"]["FontFace"] = Font.new([[rbxasset://fonts/families/RobotoMono.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+				OptionButton["38"]["Size"] = UDim2.new(0, 350, 0, 26);
+				OptionButton["38"]["BackgroundTransparency"] = 0;
+				OptionButton["38"]["Name"] = [[option]];
+				OptionButton["38"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+				OptionButton["38"]["Text"] = "    " .. tostring(option);
+				
+				OptionButton["38"].MouseEnter:Connect(function()
+					Library:_tween(
+						OptionButton["38"],
+						{
+							BackgroundColor3 = Color3.fromRGB(38, 38, 38),
+							TextColor3 = Color3.fromRGB(50, 255, 67)
+						}
+					)
+				end)
+				
+				OptionButton["38"].MouseLeave:Connect(function()
+					Library:_tween(
+						OptionButton["38"],
+						{
+							BackgroundColor3 = Color3.fromRGB(31, 31, 31),
+							TextColor3 = Color3.fromRGB(168, 168, 168)
+						}
+					)
+				end)
+				
+				OptionButton["38"].MouseButton1Down:Connect(function()
+					Dropdown.Selected = option
+					Dropdown["35"].Text = option
+					Dropdown:Close()
+					options.Callback(option)
+				end)
+				
+				table.insert(Dropdown.OptionButtons, OptionButton)
+			end
+
+			--// Methods
+			function Dropdown:Open()
+				if not Dropdown.Open then
+					Dropdown.Open = true
+					local optionCount = #options.Options
+					local targetSize = UDim2.new(0, 350, 0, 30 + (optionCount * 26) + ((optionCount - 1) * 2))
+					
+					Library:_tween(
+						Dropdown["30"],
+						{Size = targetSize}
+					)
+					Library:_tween(
+						Dropdown["36"],
+						{Size = UDim2.new(0, 350, 0, (optionCount * 26) + ((optionCount - 1) * 2))}
+					)
+					Library:_tween(
+						Dropdown["32"],
+						{Rotation = 180}
+					)
+				end
+			end
+			
+			function Dropdown:Close()
+				if Dropdown.Open then
+					Dropdown.Open = false
+					
+					Library:_tween(
+						Dropdown["30"],
+						{Size = UDim2.new(0, 350, 0, 30)}
+					)
+					Library:_tween(
+						Dropdown["36"],
+						{Size = UDim2.new(0, 350, 0, 0)}
+					)
+					Library:_tween(
+						Dropdown["32"],
+						{Rotation = 0}
+					)
+				end
+			end
+			
+			function Dropdown:SetValue(value)
+				if table.find(options.Options, value) then
+					Dropdown.Selected = value
+					Dropdown["35"].Text = value
+					options.Callback(value)
+				end
+			end
+			
+			function Dropdown:GetValue()
+				return Dropdown.Selected
+			end
+
+			--// Logic
+			do
+				Dropdown["31"].MouseButton1Down:Connect(function()
+					if Dropdown.Open then
+						Dropdown:Close()
+					else
+						Dropdown:Open()
+					end
+				end)
+				
+				--// Set default value
+				if options.Default then
+					Dropdown:SetValue(options.Default)
+				end
+			end
+			
+			return Dropdown
+		end
+		
 		return Tab
 	end
 	
